@@ -1,0 +1,1502 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "katex/dist/katex.min.css";
+@import "flag-icons/css/flag-icons.min.css";
+@plugin "@tailwindcss/typography";
+@source not "../doc";
+
+/* ─── formerly `@import "shadcn/tailwind.css"` ───────────────────────────────
+   Inlined so the `shadcn` package could be removed. Kept only what's still
+   used (checked with a repo-wide grep for each `data-*:` class): data-open
+   (Headless UI Menu/Popover/Listbox/Disclosure triggers across sidebar,
+   toolbar, editor, pages, admin), data-selected/data-disabled (Listbox/Tab
+   options in select.tsx, icon-picker, search-dialog, etc.), data-active/
+   data-horizontal/data-vertical (tabs.tsx, separator.tsx, toggle-group.tsx).
+   Previously dropped as dead: the accordion-down/up @keyframes (Tier 0's
+   accordion.tsx uses native <details>), the data-checked/data-unchecked
+   variants (state now computed in React, not CSS), and data-closed (the
+   Radix dialog/sheet/popover/etc. it targeted were replaced by native
+   <dialog>-based primitives — no `data-closed:` class exists anymore).
+   Grep before re-adding any of these. */
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-selected {
+  &:where([data-selected="true"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
+/* ─── Native <dialog>-based Dialog/AlertDialog/Sheet primitives ──────────────
+   Radix removed in favor of the browser's own modal semantics (showModal()
+   gives focus-trap + Escape + top-layer stacking for free). Four things the
+   UA stylesheet doesn't give us: (1) it centers a modal dialog via
+   `inset: 0; margin: auto`, which fights our own position classes — reset in
+   `@layer base` so it's always beaten by the (higher-priority) utility
+   classes that set explicit top/right/bottom/left; (2) open/close animation,
+   done with @starting-style so it's pure CSS, no animation-end listeners;
+   (3) the UA stylesheet also makes `dialog` a scroll container (`overflow:
+   auto`), which shows a spurious horizontal scrollbar from sub-pixel
+   rounding in flex footers even though content never actually overflows
+   sideways — killed here since these dialogs only ever need to scroll
+   vertically (see max-height above); (4) `AlertDialogPortal`/`DialogPortal`
+   don't actually portal to <body> (native <dialog> already escapes ancestor
+   stacking/clipping via the top layer for painting), so a dialog mounted
+   inside e.g. a table cell with `whitespace-nowrap` still *inherits* that
+   `white-space` down the DOM tree — top-layer promotion only changes paint
+   order, not CSS inheritance — silently breaking text wrapping. Reset here
+   so dialog content always wraps regardless of where it's mounted. */
+@layer base {
+  dialog[data-slot="dialog-content"],
+  dialog[data-slot="sheet-content"],
+  dialog[data-slot="alert-dialog-content"] {
+    inset: auto;
+    max-height: 100vh;
+    margin: 0;
+    overflow-x: hidden;
+    white-space: normal;
+  }
+}
+
+dialog[data-slot="dialog-content"],
+dialog[data-slot="alert-dialog-content"] {
+  opacity: 1;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    overlay 150ms ease allow-discrete,
+    display 150ms ease allow-discrete;
+}
+dialog[data-slot="dialog-content"]:not([open]),
+dialog[data-slot="alert-dialog-content"]:not([open]) {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.95);
+}
+@starting-style {
+  dialog[data-slot="dialog-content"][open],
+  dialog[data-slot="alert-dialog-content"][open] {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+}
+
+dialog[data-slot="sheet-content"] {
+  transition:
+    transform 200ms ease,
+    overlay 200ms ease allow-discrete,
+    display 200ms ease allow-discrete;
+}
+dialog[data-slot="sheet-content"]:not([open]) {
+  transform: translateX(0);
+}
+dialog[data-slot="sheet-content"][data-side="right"]:not([open]) {
+  transform: translateX(100%);
+}
+dialog[data-slot="sheet-content"][data-side="left"]:not([open]) {
+  transform: translateX(-100%);
+}
+dialog[data-slot="sheet-content"][data-side="top"]:not([open]) {
+  transform: translateY(-100%);
+}
+dialog[data-slot="sheet-content"][data-side="bottom"]:not([open]) {
+  transform: translateY(100%);
+}
+@starting-style {
+  dialog[data-slot="sheet-content"][data-side="right"][open] {
+    transform: translateX(100%);
+  }
+  dialog[data-slot="sheet-content"][data-side="left"][open] {
+    transform: translateX(-100%);
+  }
+  dialog[data-slot="sheet-content"][data-side="top"][open] {
+    transform: translateY(-100%);
+  }
+  dialog[data-slot="sheet-content"][data-side="bottom"][open] {
+    transform: translateY(100%);
+  }
+}
+
+dialog[data-slot="dialog-content"]::backdrop,
+dialog[data-slot="sheet-content"]::backdrop {
+  background-color: rgb(0 0 0 / 0.2);
+  transition:
+    background-color 150ms ease,
+    overlay 150ms ease allow-discrete,
+    display 150ms ease allow-discrete;
+}
+dialog[data-slot="alert-dialog-content"]::backdrop {
+  background-color: rgb(0 0 0 / 0.4);
+  transition:
+    background-color 150ms ease,
+    overlay 150ms ease allow-discrete,
+    display 150ms ease allow-discrete;
+}
+dialog:not([open])::backdrop {
+  background-color: rgb(0 0 0 / 0);
+}
+@starting-style {
+  dialog[open]::backdrop {
+    background-color: rgb(0 0 0 / 0);
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─── daisyUI theme ───────────────────────────────────────────────────────
+   Migration phase: daisy's own stock `light`/`dark` themes, no product theme.
+   Colour, radius-field/box/selector, noise and field-size all come from
+   daisy's built-ins — nothing customised here. A product-specific theme is a
+   separate future task; do not add one to this block.
+   The one exception is `--depth`, which the stock themes ship at 1 and which
+   is forced back to 0 in the `:root` block below — see the comment there.
+   It lives there, not here, precisely so this block stays theme-free. */
+@plugin "daisyui" {
+  themes:
+    light --default,
+    dark;
+}
+
+/* ─── dark theme: base surface hierarchy override ────────────────────────
+   daisy's stock `dark` theme packs base-100/200/300 into a ~4-point OKLCH
+   lightness band (21%–25%), vs. the stock `light` theme's 95%–100% band.
+   That's fine in light mode — near white, a few points of lightness read as
+   a clearly visible step — but the same few points crush together near-
+   black, so cards, inputs, dropdowns, popovers and modals all read as one
+   indistinguishable surface, and `border-base-300` (used almost everywhere
+   as the default border, see the `* { border-base-300 }` rule below)
+   becomes nearly invisible.
+   Widened here to a GitHub/Linear-style three-step scale, same hue family
+   (~254, the app's existing cool blue-gray) as the stock theme:
+     base-200 (canvas)  — darkest: page bg, sidebar, app shell
+     base-100 (surface) — mid: cards, dropdowns, dialogs, inputs, table rows
+     base-300 (border)  — lightest: borders, dividers, hover/selected fill
+   base-300 is deliberately the *lightest* of the three, not the darkest
+   (light theme's own order) — a border needs to contrast against whatever's
+   on both sides of it, and near-black darkening-further is far harder to
+   perceive than a lighter step, which is also why the existing call sites
+   already lean on it that way (e.g. sidebar.tsx's icon buttons sit directly
+   on base-200 and use `hover:bg-base-300` for their hover fill — under the
+   stock values that hover was *darker* than the sidebar itself, i.e.
+   invisible).
+   This MUST go through `@plugin "daisyui/theme"` (which merges these tokens
+   into daisy's own generated `[data-theme="dark"]` base-layer rule) rather
+   than a plain `.dark { --color-base-300: ... }` override — Tailwind v4's
+   build silently drops raw `--color-*` custom-property declarations that
+   don't go through its own theme-registration path; only every other token
+   here (not `--color-*`) survives that route. Every token this block omits
+   still falls through to the stock `dark` theme (see theme/index.js's
+   `{...builtinTheme, ...customThemeTokens}` merge) — only base-100/200/300
+   are touched. `light` (the default theme, untouched above) is not
+   affected.
+
+   `--color-neutral` is repurposed the same way, as this app's dedicated
+   *elevated floating surface* token (dropdowns, popovers, dialogs, menus,
+   tooltips). daisy ships `neutral`/`neutral-content` for its own opaque-fill
+   components (`.btn-neutral`, `.badge-neutral`, …), none of which this app
+   uses (grep `bg-neutral|border-neutral|badge-neutral|btn-neutral` before
+   reusing it for anything else — confirmed empty at the time this was
+   written) — so the slot is free, and reusing a real daisy token here
+   instead of inventing a new CSS variable keeps every colour in the app
+   flowing through daisy's own theme system.
+   Why a 4th surface level is needed at all: base-100 is both "the card/
+   input/main-content surface" *and*, previously, "the dropdown/popover/
+   dialog fill" — fine in light mode (a white popover over a white page
+   still reads via its shadow), but in dark mode a popover opened from a
+   base-100 toolbar (e.g. the Share button, Global Search) was the exact
+   same colour as the surface it floats over, so only a 1px border
+   separated them. `neutral` is kept reliably lighter than *both* base-100
+   and base-200 so it pops regardless of what's behind it — see `light`
+   below for why this doesn't touch light mode at all. */
+@plugin "daisyui/theme" {
+  name: "dark";
+  --color-base-200: oklch(16% 0.014 254);
+  --color-base-100: oklch(21% 0.014 254);
+  --color-base-300: oklch(32% 0.016 254);
+  --color-neutral: oklch(27% 0.015 254);
+}
+
+/* `light`'s own dropdowns/popovers/dialogs already read correctly against
+   base-100 (see comment above) — `neutral` here is set to plain base-100 so
+   `bg-neutral`, used by every floating-surface component, renders pixel-
+   identical to how it looked before this token existed. */
+@plugin "daisyui/theme" {
+  name: "light";
+  --color-neutral: var(--color-base-100);
+}
+
+/* Tailwind v4 resolves `dark:` against prefers-color-scheme by default, which
+   would ignore an explicit user choice. Bind it to the .dark class that
+   next-themes puts on <html> so the toggle actually drives the variants. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+  scroll-padding-top: 68px; /* offset for fixed nav */
+  background: var(--color-base-200);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  letter-spacing: 0;
+  background-size: 32px 32px;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono);
+
+  /* Typography scale */
+  --text-2xs: 0.625rem;
+  --tracking-eyebrow: 0.16em;
+  --tracking-ui: 0.08em;
+
+  /* Shadows — genuinely app-specific (daisy has no equivalent token) */
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-float: var(--shadow-float);
+
+  /* Radius scale — 5 steps, use these everywhere. Unrelated to daisy's own
+     --radius-field/box/selector (those come from the stock theme now). */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius: 8px;
+}
+
+/* ── Remaining custom tokens ────────────────────────────────────────────────
+   Everything shadcn-shaped (--background, --foreground, --card, --primary,
+   --border, --muted-foreground, --sidebar-*, --page, etc.) is gone — daisy's
+   stock light/dark themes (`@plugin "daisyui"` above) are the only source of
+   colour now, consumed directly via daisy's own classes (bg-base-200,
+   text-base-content, bg-primary, border-base-300, ...). What's left here is
+   only what daisy genuinely has no concept of: syntax-highlight tokens and
+   comment-annotation tokens for the editor. Both are derived from daisy's
+   own vars via var()/color-mix so they re-resolve automatically per theme —
+   no hand-authored hex, no dark-specific duplicate list. */
+:root {
+  /* ── daisy depth: off ─────────────────────────────────────────────────────
+     daisy's stock light/dark themes both ship `--depth: 1`, and every depth-
+     aware component derives a real shadow from it — `.btn` alone builds
+     `--btn-shadow`, `--btn-inset` and a `text-shadow` off this one number, so
+     with the stock themes in place every button in the app was painting
+     shadows. Hard Rule 19 forbids shadows anywhere, and Phase 0 measured its
+     54/54 button parity with `--depth: 0`; that value was lost when the
+     product theme was dropped for daisy's built-ins. Restored here rather
+     than in the `@plugin` block so no product theme has to be reintroduced.
+     `--noise` is already 0 in both stock themes.
+     Declared unlayered, like daisy's own themes.css, so it beats
+     `[data-theme=light]` / `[data-theme=dark]` on source order at equal
+     specificity — verified against the production bundle, not assumed. */
+  --depth: 0;
+
+  /* ── Shadows ──────────────────────────────────────────────────────────────
+     Concrete values live here (not in `@theme inline` above) so they can be
+     re-declared per theme in `.dark`. The `@theme inline` entries are only
+     aliases that expose them as `shadow-card`/`raised`/`float` utilities. */
+  --shadow-card:
+    0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-raised:
+    0 4px 12px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.05);
+  --shadow-float:
+    0 8px 24px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+
+  /* ── Syntax highlight tokens ──────────────────────────────────────────── */
+  --syntax-keyword: var(--color-primary);
+  --syntax-string: var(--color-success);
+  --syntax-number: color-mix(
+    in srgb,
+    var(--color-success) 80%,
+    var(--color-base-content)
+  );
+  --syntax-comment: color-mix(
+    in srgb,
+    var(--color-base-content) 70%,
+    transparent
+  );
+  --syntax-function: color-mix(
+    in srgb,
+    var(--color-warning) 85%,
+    var(--color-base-content)
+  );
+  --syntax-type: color-mix(
+    in srgb,
+    var(--color-primary) 50%,
+    var(--color-success)
+  );
+  --syntax-variable: color-mix(
+    in srgb,
+    var(--color-base-content) 90%,
+    var(--color-primary)
+  );
+  --syntax-tag: var(--color-error);
+  --syntax-meta: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+
+  /* ── Comment annotations (see .comment-highlight) — violet, independent of
+     the theme's primary hue so an annotated range never reads as a link ── */
+  --comment-accent: #7c3aed;
+  --comment-tint: color-mix(in srgb, var(--comment-accent) 9%, transparent);
+  --comment-tint-hover: color-mix(
+    in srgb,
+    var(--comment-accent) 18%,
+    transparent
+  );
+
+  color-scheme: light;
+}
+
+.dark {
+  /* Shadows are near-black and deeper — the light-mode navy rgba washes out
+     entirely against a dark canvas. */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-raised:
+    0 4px 12px rgba(0, 0, 0, 0.48), 0 2px 4px rgba(0, 0, 0, 0.34);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.58), 0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* Lifted so the violet hue survives on a dark canvas; tint percentages are
+     stronger too since the same alpha reads fainter against a dark base. */
+  --comment-accent: #a78bfa;
+  --comment-tint: color-mix(in srgb, var(--comment-accent) 20%, transparent);
+  --comment-tint-hover: color-mix(
+    in srgb,
+    var(--comment-accent) 32%,
+    transparent
+  );
+
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-base-300 outline-primary/50;
+  }
+  body {
+    @apply bg-base-200 text-base-content;
+  }
+  html {
+    @apply font-sans;
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for],
+  select {
+    cursor: pointer;
+  }
+  /* ── Typography uniformity ───────────────────────── */
+
+  /* Base — all UI text uses Inter with lining numerals + localized forms.
+     This is the single source of truth for font-feature-settings: the property
+     does not merge across rules, so a second declaration elsewhere silently
+     drops every feature listed here. The cv* alternates (single-storey a,
+     straight-tailed l, open g) must stay in this one list to take effect. */
+  body,
+  button,
+  input,
+  textarea,
+  select {
+    font-family:
+      var(--font-sans), ui-sans-serif, system-ui, "Segoe UI", Helvetica, Arial,
+      sans-serif;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1,
+      "ss01" 1,
+      "lnum" 1,
+      "locl" 1,
+      "cv05" 1,
+      "cv08" 1,
+      "cv10" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: 0;
+  }
+
+  /* Headings — Notion scale: tight tracking, 700 weight */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+  }
+  h2 {
+    font-size: 1.625rem;
+    font-weight: 700;
+    line-height: 1.23;
+    letter-spacing: -0.024em;
+  }
+  h3 {
+    font-size: 1.375rem;
+    font-weight: 700;
+    line-height: 1.27;
+    letter-spacing: -0.011em;
+  }
+  h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.006em;
+  }
+  h5 {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.003em;
+  }
+  h6 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0;
+  }
+
+  /* Body / paragraph */
+  p {
+    line-height: 1.5;
+    letter-spacing: 0;
+  }
+
+  /* Small UI labels — sidebar, tabs, breadcrumbs */
+  label,
+  caption {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  /* Code & mono */
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-feature-settings: "liga" 0;
+    letter-spacing: 0;
+  }
+
+  /* Colour transitions are scoped to elements that actually change colour on
+     interaction. The previous `*, *::before, *::after` rule attached a
+     transition to every node in the document — in the database and table views
+     that is thousands of cells the compositor has to track, for no visual
+     benefit, since static text never changes colour. */
+  :where(
+    a,
+    button,
+    [role="button"],
+    [role="menuitem"],
+    [role="option"],
+    [role="tab"],
+    input,
+    textarea,
+    select,
+    summary,
+    label,
+    [data-slot="button"],
+    [data-slot="sidebar-menu-button"]
+  ) {
+    transition-timing-function: ease;
+    transition-duration: 140ms; /* hover feedback under ~150ms reads as instant */
+    transition-property:
+      background-color, border-color, color, box-shadow, opacity, filter;
+  }
+  /* Disable transitions on elements that opt out */
+  .no-transition,
+  .no-transition * {
+    transition: none !important;
+  }
+  /* Focus-visible rings — Sky Deep, clean.
+     No border-radius here: the outline already follows the element's own
+     corner shape, and forcing 4px squared off the ring on avatars, pill
+     buttons and every other non-8px-radius control. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  /* Scrollbar — thin, design-system tinted */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-base-300);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  }
+  * {
+    scrollbar-color: var(--color-base-300) transparent;
+    scrollbar-width: thin;
+  }
+
+  /* Respect the OS "reduce motion" setting globally. Colour/opacity fades are
+     left intact — they carry state (hover, focus, validity) and are not the
+     vestibular trigger; movement and scaling are what get neutralised. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ── Scrollbar utilities ─────────────────────────────────────────────────── */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Wide, horizontally-scrollable content (e.g. the template table preview) —
+   a visible track makes it obvious there's more to the right, instead of
+   the default hairline thumb-on-transparent-track that's easy to miss. */
+.template-hscroll {
+  scrollbar-color: var(--color-base-300) var(--color-base-200);
+}
+.template-hscroll::-webkit-scrollbar {
+  height: 8px;
+}
+.template-hscroll::-webkit-scrollbar-track {
+  background: var(--color-base-200);
+  border-radius: 99px;
+}
+
+/* ── Button hover effects ────────────────────────────────────────────────── */
+@layer components {
+  /* PRIMARY */
+  button.bg-primary:not(:disabled):hover,
+  a.bg-primary:hover {
+    filter: brightness(1.06);
+  }
+  button.bg-primary:not(:disabled):active,
+  a.bg-primary:active {
+    filter: brightness(0.96);
+  }
+
+  /* ERROR / destructive */
+  button.bg-error:not(:disabled):hover,
+  a.bg-error:hover {
+    filter: brightness(1.06);
+  }
+  button.bg-error:not(:disabled):active {
+    filter: brightness(0.96);
+  }
+}
+
+/* ── TipTap / ProseMirror editor content styles ─────────────────────────── */
+.ProseMirror,
+.ProseMirror:focus,
+.ProseMirror:focus-visible {
+  font-size: 1rem;
+  font-feature-settings:
+    "rlig" 1,
+    "calt" 1,
+    "ss01" 1,
+    "lnum" 1,
+    "locl" 1;
+  line-height: 1.6;
+  color: var(--color-base-content);
+  word-break: break-word;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Headings */
+.ProseMirror h1 {
+  margin: 1.75rem 0 0.35rem;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--color-base-content);
+  letter-spacing: -0.02em;
+}
+.ProseMirror h2 {
+  margin: 1.4rem 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-base-content);
+  letter-spacing: -0.018em;
+}
+.ProseMirror h3 {
+  margin: 1.2rem 0 0.2rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-base-content);
+  letter-spacing: -0.01em;
+}
+
+/* Paragraph */
+.ProseMirror p {
+  margin: 0.15rem 0;
+  line-height: 1.6;
+}
+
+/* Ordered lists — declared before the bullet-list block below purely for
+   cascade order: `.ProseMirror > ol > li` is less specific than
+   `.ProseMirror ul:not([data-type="taskList"]) > li`, and a lower-specificity
+   selector must not follow a higher one. The two never match the same element
+   (a li is in either a ul or an ol), so the order has no visual effect. */
+.ProseMirror {
+  counter-reset: ol-counter;
+}
+.ProseMirror > :not(ol) {
+  counter-reset: ol-counter;
+}
+.ProseMirror > ol {
+  padding-left: 1.75rem;
+  margin: 0.25rem 0;
+  list-style: none;
+}
+.ProseMirror > ol > li {
+  position: relative;
+  margin: 0.15rem 0;
+  line-height: 1.6;
+  counter-increment: ol-counter;
+}
+.ProseMirror > ol > li::before {
+  position: absolute;
+  top: 0;
+  left: -1.75rem;
+  width: 1.5rem;
+  padding-right: 0.3rem;
+  font-size: 1rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+  color: var(--color-primary);
+  text-align: right;
+  content: counter(ol-counter) ".";
+}
+
+/* Bullet list */
+.ProseMirror ul:not([data-type="taskList"]) {
+  padding-left: 1.5rem;
+  margin: 0.35rem 0;
+  list-style: none;
+}
+.ProseMirror ul:not([data-type="taskList"]) > li {
+  position: relative;
+  margin: 0.15rem 0;
+  line-height: 1.6;
+}
+.ProseMirror ul:not([data-type="taskList"]) > li::before {
+  position: absolute;
+  top: 0.6em;
+  left: -1.15rem;
+  width: 6px;
+  height: 6px;
+  content: "";
+  background: var(--color-primary);
+  border-radius: 50%;
+  opacity: 0.45;
+}
+
+/* Task list */
+.ProseMirror ul[data-type="taskList"] {
+  padding-left: 0;
+  margin: 0.25rem 0;
+  list-style: none;
+}
+.ProseMirror ul[data-type="taskList"] > li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.15rem 0;
+  margin: 0;
+}
+.ProseMirror ul[data-type="taskList"] > li > label {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin-top: 0.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+.ProseMirror ul[data-type="taskList"] > li > label > span {
+  display: none;
+}
+.ProseMirror ul[data-type="taskList"] > li > label > input[type="checkbox"] {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  background: transparent;
+  border: 1.5px solid var(--color-base-300);
+  border-radius: 50%;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.ProseMirror
+  ul[data-type="taskList"]
+  > li
+  > label
+  > input[type="checkbox"]:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+.ProseMirror
+  ul[data-type="taskList"]
+  > li
+  > label
+  > input[type="checkbox"]:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+/* Flexbox centers the checkmark's own box on the circle — no absolute-position
+   percentage math to keep in sync if the circle's size ever changes. The
+   small margin-top is a deliberate optical nudge: the tick is only a
+   bottom+right border ("L" shape) rotated 45deg, so its visible stroke sits
+   lower than its own bounding box once rotated. */
+.ProseMirror ul[data-type="taskList"]
+  > li
+  > label
+  > input[type="checkbox"]:checked::after {
+  width: 4px;
+  height: 7px;
+  margin-top: -1px;
+  content: "";
+  border: 2px solid var(--color-primary-content);
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+.ProseMirror ul[data-type="taskList"] > li > div {
+  flex: 1;
+  min-width: 0;
+}
+.ProseMirror ul[data-type="taskList"] > li > div > p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-base-content);
+}
+.ProseMirror ul[data-type="taskList"] > li[data-checked="true"] > div > p {
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  text-decoration: line-through;
+}
+
+/* Blockquote */
+.ProseMirror blockquote {
+  padding: 0.6rem 1rem;
+  margin: 0.75rem 0;
+  color: var(--color-base-content);
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* Code inline */
+.ProseMirror code {
+  padding: 0.1em 0.4em;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+  color: var(--color-primary);
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-xs);
+}
+
+/* Code block — light design system style */
+.ProseMirror pre {
+  position: relative;
+  margin: 0.75rem 0;
+  overflow: hidden;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-md);
+}
+.ProseMirror pre code {
+  display: block;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.875em;
+  line-height: 1.7;
+  color: var(--color-base-content);
+  tab-size: 2;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+/* Syntax highlight token colors — use design-system CSS variables */
+.ProseMirror pre .hljs-keyword,
+.ProseMirror pre .hljs-selector-tag {
+  font-weight: 500;
+  color: var(--syntax-keyword);
+}
+.ProseMirror pre .hljs-string,
+.ProseMirror pre .hljs-attr {
+  color: var(--syntax-string);
+}
+.ProseMirror pre .hljs-number,
+.ProseMirror pre .hljs-literal {
+  color: var(--syntax-number);
+}
+.ProseMirror pre .hljs-comment {
+  font-style: italic;
+  color: var(--syntax-comment);
+}
+.ProseMirror pre .hljs-function,
+.ProseMirror pre .hljs-title {
+  color: var(--syntax-function);
+}
+.ProseMirror pre .hljs-type,
+.ProseMirror pre .hljs-class {
+  color: var(--syntax-type);
+}
+.ProseMirror pre .hljs-variable,
+.ProseMirror pre .hljs-name {
+  color: var(--syntax-variable);
+}
+.ProseMirror pre .hljs-built_in {
+  color: var(--syntax-type);
+}
+.ProseMirror pre .hljs-punctuation {
+  color: var(--color-base-content);
+}
+.ProseMirror pre .hljs-operator {
+  color: var(--color-base-content);
+}
+.ProseMirror pre .hljs-tag {
+  color: var(--syntax-tag);
+}
+.ProseMirror pre .hljs-meta {
+  color: var(--syntax-meta);
+}
+
+/* Toggle block — Notion-style */
+.ProseMirror details {
+  padding: 12px 0 12px 8px;
+  margin: 1px 0;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease;
+}
+
+/* Whole block hover — covers summary + all content children */
+.ProseMirror details:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+/* ── Summary row ── */
+.ProseMirror details > summary {
+  position: relative;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding: 2px 4px 2px 0;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-base-content);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  list-style: none;
+  background: transparent !important;
+  border-radius: var(--radius-sm);
+}
+.ProseMirror details > summary::-webkit-details-marker {
+  display: none;
+}
+.ProseMirror details > summary::marker {
+  display: none;
+}
+
+/* Suppress only browser focus/focus-visible highlight */
+.ProseMirror details > summary:focus,
+.ProseMirror details > summary:focus-visible {
+  outline: none;
+  background: transparent !important;
+}
+
+/* summary hover — transparent so parent details:hover bg shows through */
+.ProseMirror details > summary:hover {
+  background: transparent !important;
+}
+
+/* ── Solid filled triangle — primary color, Notion style ── */
+.ProseMirror details > summary::before {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  content: "";
+  background-color: var(--color-primary);
+  opacity: 0.5;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpolygon points='2,1 9,5 2,9' fill='black'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpolygon points='2,1 9,5 2,9' fill='black'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: 10px 10px;
+  mask-size: 10px 10px;
+  transition:
+    transform 0.2s ease,
+    opacity 0.15s ease;
+}
+
+/* Open — rotate 90° to point down */
+.ProseMirror details[open] > summary::before {
+  opacity: 0.65;
+  transform: rotate(90deg);
+}
+
+/* Hover — triangle gets slightly more visible */
+.ProseMirror details > summary:hover::before {
+  opacity: 0.8;
+}
+
+/* ── Empty summary placeholder — "Toggle" hint text ── */
+.ProseMirror details > summary.is-empty::after {
+  font-style: normal;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  pointer-events: none;
+  content: "Toggle";
+  opacity: 0.75;
+}
+
+/* ── Content area — smooth open AND close ── */
+.ProseMirror details > *:not(summary) {
+  display: none;
+  opacity: 0;
+  transform: translateY(-6px);
+  overflow: hidden;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    display 0.22s;
+  transition-behavior: allow-discrete;
+}
+
+.ProseMirror details[open] > *:not(summary) {
+  display: block;
+  padding-left: 0.25rem;
+  margin-left: 1.5rem;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@starting-style {
+  .ProseMirror details[open] > *:not(summary) {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* ── Empty toggle content placeholder ── */
+.ProseMirror details[open] > p.is-empty:first-of-type::before {
+  font-style: italic;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  pointer-events: none;
+  content: "Empty toggle. Click or drop blocks inside." !important;
+  opacity: 0.75;
+}
+
+/* Callout block */
+.ProseMirror div[data-type="callout"] {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.875rem 1rem;
+  margin: 0.5rem 0;
+  background: color-mix(
+    in srgb,
+    var(--color-primary) 6%,
+    var(--color-base-100)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--color-primary) 20%, var(--color-base-300));
+  border-radius: var(--radius-md);
+}
+.ProseMirror div[data-type="callout"]::before {
+  flex-shrink: 0;
+  min-width: 1.5rem;
+  font-size: 1.1rem;
+  line-height: 1.7;
+  content: attr(icon);
+}
+.ProseMirror div[data-type="callout"] p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Horizontal rule / Divider */
+.ProseMirror hr {
+  height: 2px;
+  margin: 1.5rem 0;
+  background: var(--color-base-300);
+  border: none;
+  border-radius: 9999px;
+  opacity: 1;
+}
+
+/* Links */
+.ProseMirror a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--color-primary) 40%,
+    transparent
+  );
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s ease;
+}
+.ProseMirror a:hover {
+  text-decoration-color: var(--color-primary);
+}
+
+/* Placeholder — show on every empty paragraph, not just the first */
+.ProseMirror p.is-empty::before {
+  float: left;
+  height: 0;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  pointer-events: none;
+  content: attr(data-placeholder);
+  opacity: 0.75;
+}
+
+/* ── Columns ──────────────────────────────────────────────────────────────── */
+.ProseMirror [data-type="columns"] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin: 0.75rem 0;
+  overflow: hidden;
+  border: 1.5px solid var(--color-base-300);
+  border-radius: var(--radius-md);
+}
+/* Each direct child block = one column cell */
+.ProseMirror [data-type="columns"] > * {
+  min-height: 3.5rem;
+  padding: 0.75rem 1rem;
+}
+.ProseMirror [data-type="columns"] > *:not(:last-child) {
+  border-right: 1.5px solid var(--color-base-300);
+}
+
+/* ── Table of Contents placeholder ───────────────────────────────────────── */
+.ProseMirror [data-type="toc"] {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  user-select: none;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-md);
+}
+.ProseMirror [data-type="toc"]::before {
+  content: "≡  Table of Contents — auto-populated from headings";
+}
+
+/* ── Inline Database placeholder ──────────────────────────────────────────── */
+.ProseMirror [data-type="inlineDatabase"] {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  user-select: none;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-md);
+}
+.ProseMirror [data-type="inlineDatabase"]::before {
+  content: "⊞  Inline Database — available in Phase 8";
+}
+
+/* ── Template Button — now handled by React NodeView (see reference-blocks.tsx) ── */
+
+/* ── Simple Table (TipTap table extension) ────────────────────────────────── */
+.ProseMirror table {
+  width: 100%;
+  margin: 0.75rem 0;
+  overflow: hidden;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.ProseMirror table td,
+.ProseMirror table th {
+  position: relative;
+  min-width: 80px;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  text-align: left;
+  border: 1px solid
+    color-mix(in srgb, var(--color-base-content) 45%, var(--color-base-300));
+}
+.ProseMirror table th {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: var(--color-base-200);
+}
+.ProseMirror table .selectedCell::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  pointer-events: none;
+  content: "";
+  background: var(--color-primary);
+  opacity: 0.12;
+}
+.ProseMirror table .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -2px;
+  z-index: 10;
+  width: 3px;
+  pointer-events: none;
+  background-color: var(--color-primary);
+}
+.ProseMirror table p {
+  margin: 0;
+}
+
+/* ── Database table borders ──
+   Driven by the border token rather than a hardcoded warm-grey rgba, which
+   both clashed with the blue-tinted palette and sat around 1.06:1 — invisible,
+   so table rows had no separation at all. */
+.db-border-b {
+  border-bottom: 1px solid var(--color-base-300) !important;
+}
+.db-header-b {
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-base-content) 22%, var(--color-base-300)) !important;
+}
+
+/* Page-level comments section flash — triggered when header Comments button is clicked */
+@keyframes comments-section-flash {
+  0% {
+    background-color: transparent;
+  }
+  25% {
+    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.comments-section-flash {
+  border-radius: 12px;
+  animation: comments-section-flash 1s ease-out;
+}
+
+/* Comment text-range highlight. Violet rather than the brand blue so an
+   annotated range never reads as a link; --comment-accent carries that hue
+   per theme, and the tints are stated per theme rather than derived because a
+   7% wash that reads clearly on white disappears entirely on #0B1220. */
+.comment-highlight {
+  cursor: pointer;
+  background-color: var(--comment-tint);
+  border-bottom: 2px solid
+    color-mix(in srgb, var(--comment-accent) 60%, transparent);
+  border-radius: 2px;
+}
+.comment-highlight:hover {
+  background-color: var(--comment-tint-hover);
+}
+
+/* ── Landing page animations ─────────────────────────────────────────────── */
+@keyframes lp-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes lp-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes lp-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.lp-fade-up {
+  animation: lp-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.lp-fade-in {
+  animation: lp-fade-in 0.5s ease both;
+}
+.lp-scale-in {
+  animation: lp-scale-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Hero ambient glow — a soft, slowly-breathing radial wash in the
+   product's own accent color, purely decorative ── */
+@keyframes lp-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: translate(-50%, -33%) scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate(-50%, -33%) scale(1.08);
+  }
+}
+.lp-glow {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-primary) 22%, transparent) 0%,
+    transparent 70%
+  );
+  filter: blur(40px);
+  animation: lp-glow-pulse 8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-glow {
+    opacity: 0.6;
+    animation: none;
+  }
+}
+
+/* ── Scroll-reveal (IntersectionObserver driven) ──────────────────────────── */
+.sr {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sr.sr-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Landing nav animated underline ──────────────────────────────────────── */
+.lp-nav-link {
+  position: relative;
+}
+.lp-nav-link::after {
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 0%;
+  height: 1.5px;
+  content: "";
+  background-color: var(--color-base-content);
+  transition: width 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-nav-link:hover::after {
+  width: 100%;
+}
+
+/* ── Toast — Sonner injects its own default CSS into <head> at runtime
+   (after globals.css), with a rule of equal specificity to the one below
+   ([data-sonner-toast][data-styled] vs [data-sonner-toast].cn-toast — both
+   0,2,0). On a tie, whichever rule was inserted into the DOM later wins,
+   and Sonner's injection always comes after ours — so its default drop
+   shadow, white background, and near-invisible border were silently
+   winning regardless of what we set here. !important is the correct,
+   deliberate override for third-party runtime-injected CSS (not for our
+   own app code). Rule 19 forbids the shadow; depth instead comes from a
+   soft status-tinted surface plus a matching border, each mixed from
+   existing tokens per Rule 20 — the standard toast pattern (Radix,
+   Material, Chakra): the tint carries the status, not a full-saturation
+   fill, so it stays legible and still works for every toast type. ── */
+[data-sonner-toast].cn-toast {
+  gap: 10px !important;
+  color: var(--color-base-content) !important;
+  background: color-mix(
+    in srgb,
+    var(--color-base-content) 8%,
+    var(--color-base-100)
+  ) !important;
+  border: 1.5px solid
+    color-mix(in srgb, var(--color-base-content) 22%, var(--color-base-300)) !important;
+  box-shadow: none !important;
+}
+[data-sonner-toast].cn-toast[data-type="success"] {
+  background: color-mix(
+    in srgb,
+    var(--color-success) 10%,
+    var(--color-base-100)
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--color-success) 35%,
+    var(--color-base-300)
+  ) !important;
+}
+[data-sonner-toast].cn-toast[data-type="error"] {
+  background: color-mix(
+    in srgb,
+    var(--color-error) 8%,
+    var(--color-base-100)
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--color-error) 35%,
+    var(--color-base-300)
+  ) !important;
+}
+[data-sonner-toast].cn-toast[data-type="warning"] {
+  background: color-mix(
+    in srgb,
+    var(--color-warning) 10%,
+    var(--color-base-100)
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--color-warning) 35%,
+    var(--color-base-300)
+  ) !important;
+}
+[data-sonner-toast].cn-toast[data-type="info"] {
+  background: color-mix(
+    in srgb,
+    var(--color-primary) 8%,
+    var(--color-base-100)
+  ) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary) 35%,
+    var(--color-base-300)
+  ) !important;
+}
+[data-sonner-toast].cn-toast [data-icon] {
+  align-self: flex-start;
+  width: 18px !important;
+  height: 18px !important;
+  margin-top: 1px;
+}
+[data-sonner-toast].cn-toast [data-title] {
+  font-weight: 600 !important;
+  line-height: 1.4;
+}
+[data-sonner-toast].cn-toast [data-description] {
+  margin-top: 2px;
+  line-height: 1.45;
+  color: color-mix(
+    in srgb,
+    var(--color-base-content) 70%,
+    transparent
+  ) !important;
+}
+[data-sonner-toast].cn-toast [data-button] {
+  font-weight: 600 !important;
+  color: var(--color-primary-content) !important;
+  background: var(--color-primary) !important;
+  border-radius: var(--radius-xs) !important;
+}
+[data-sonner-toast].cn-toast [data-button]:hover {
+  opacity: 0.9;
+}
+/* Bottom-center toasts (page-header "Copy link" confirmation) fit their
+   content instead of sonner's fixed 356px --width, which left a wide slab
+   of empty tint after short messages like "Link copied to clipboard". Scoped
+   to data-x-position=center so the default bottom-right toasts elsewhere —
+   which rely on the fixed width for consistent wrapping — are untouched. */
+[data-sonner-toast].cn-toast[data-x-position="center"] {
+  width: auto !important;
+  max-width: min(92vw, 420px) !important;
+}

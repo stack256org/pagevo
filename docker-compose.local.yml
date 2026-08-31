@@ -1,0 +1,17 @@
+# Publishes the app on a host port so you can reach it at
+# http://localhost:3000 without a reverse proxy in front.
+#
+# The base docker-compose.yml deliberately only `expose`s port 3000 to the
+# Docker network — under Dokploy/Traefik (or any containerized proxy) the
+# proxy reaches the app over that network, and a host binding would just be
+# attack surface plus a port collision (Dokploy's own dashboard uses 3000).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+#
+# Change the host-side port with APP_PORT in .env if 3000 is taken.
+
+services:
+  app:
+    ports:
+      - "${APP_PORT:-3000}:3000"

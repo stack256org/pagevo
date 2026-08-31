@@ -1,0 +1,1 @@
+ALTER TABLE "workspaces" ADD COLUMN "kind" text DEFAULT 'personal' NOT NULL;

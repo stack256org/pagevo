@@ -1,0 +1,1 @@
+ALTER TABLE "database_views" ADD COLUMN "board_settings" jsonb DEFAULT '{}'::jsonb NOT NULL;

@@ -1,0 +1,31 @@
+# Use prebuilt images from GitHub Container Registry instead of building
+# locally. CI publishes these on every merge to main — see
+# .github/workflows/release.yml. Pick this file when you just want to run
+# Pagevo; use the default docker-compose.yml (which builds from source) if
+# you changed the code, or need a fork's own image path.
+#
+# Usage — pull explicitly first, then start without --build so Compose uses
+# what was just pulled instead of building:
+#   docker compose -f docker-compose.yml -f docker-compose.images.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+#
+# Pin a version in production, because `latest` moves with every release:
+#   IMAGE_TAG=0.1.0 docker compose -f docker-compose.yml -f docker-compose.images.yml pull
+#   IMAGE_TAG=0.1.0 docker compose -f docker-compose.yml -f docker-compose.images.yml up -d
+#
+# Available tags: `latest`, the `0` / `0.1` / `0.1.0` ladder (once a release
+# exists), `main` (rebuilt on every change, expect rough edges), and a fixed
+# `sha-<short>` per build. Each carries builds for both Intel and ARM.
+#
+# IMAGE_REPO defaults to this repository's own GHCR path. Point it at your
+# fork's path (ghcr.io/<you>/<your-fork>) if you publish your own images.
+
+services:
+  migrate:
+    image: ${IMAGE_REPO:-ghcr.io/sahajtavethiya96/workflik}-migrator:${IMAGE_TAG:-latest}
+
+  app:
+    image: ${IMAGE_REPO:-ghcr.io/sahajtavethiya96/workflik}:${IMAGE_TAG:-latest}
+
+  worker:
+    image: ${IMAGE_REPO:-ghcr.io/sahajtavethiya96/workflik}-worker:${IMAGE_TAG:-latest}

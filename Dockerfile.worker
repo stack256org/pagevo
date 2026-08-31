@@ -1,0 +1,53 @@
+FROM node:22-bookworm-slim AS deps
+
+WORKDIR /app
+
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile --prod
+
+FROM node:22-bookworm-slim AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# No corepack/pnpm at runtime. Corepack would try to download & initialize the
+# package manager into ~/.cache on first `pnpm` call, which fails for the
+# non-root user on a fresh host (EACCES). Everything needed is already baked
+# into node_modules at build time, so we run the bundled `tsx` binary directly.
+RUN groupadd --system --gid 1001 pagevo \
+  && useradd --system --uid 1001 --gid pagevo pagevo
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY config ./config
+COPY lib ./lib
+COPY scripts ./scripts
+
+# Local-disk uploads (STORAGE_DRIVER=local) live here so cleanup/reconciliation
+# jobs (cleanup-orphaned-media, sync-storage-usage) can reach the same files
+# the app writes — mount the same volume as the app container in compose.
+RUN mkdir -p /app/uploads && chown -R pagevo:pagevo /app/uploads
+
+USER pagevo
+
+# No HTTP server to poll (unlike the app container) — the worker touches
+# /tmp/worker-heartbeat on an interval (scripts/worker.ts); unhealthy if
+# that file hasn't been refreshed in over a minute (hung/crash-looping).
+HEALTHCHECK --interval=15s --timeout=5s --start-period=15s --retries=3 \
+  CMD test -f /tmp/worker-heartbeat && [ $(( $(date +%s) - $(stat -c %Y /tmp/worker-heartbeat) )) -lt 60 ]
+
+CMD ["/app/node_modules/.bin/tsx", "scripts/worker.ts"]
+
+# OCI metadata — this is what renders on the GitHub Packages page.
+LABEL org.opencontainers.image.title="Pagevo Worker" \
+      org.opencontainers.image.description="Background job worker (pg-boss) for Pagevo — email, notifications, cleanup jobs." \
+      org.opencontainers.image.url="https://github.com/sahajtavethiya96/Workflik" \
+      org.opencontainers.image.source="https://github.com/sahajtavethiya96/Workflik" \
+      org.opencontainers.image.documentation="https://github.com/sahajtavethiya96/Workflik#readme" \
+      org.opencontainers.image.licenses="AGPL-3.0-or-later"

@@ -1,0 +1,1 @@
+ALTER TABLE "user_preferences" ALTER COLUMN "sidebar_width" SET DEFAULT 300;
