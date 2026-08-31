@@ -1,0 +1,1 @@
+ALTER TABLE "template_categories" ADD COLUMN "icon" text;

@@ -1,0 +1,1 @@
+ALTER TABLE "integration_settings" DROP COLUMN "cdn_url";

@@ -1,0 +1,73 @@
+name: Docker build sanity check
+
+# Build-only — no push, no registry credentials needed. Confirms the
+# self-hosted Docker path (Dockerfile, Dockerfile.worker, docker-compose.yml)
+# keeps working as the app code changes, since nothing else in CI exercises it.
+#
+# PR-only: release.yml already builds (and, on main, pushes) all three
+# targets after CI passes on main, so a separate push-triggered run here
+# would just duplicate that work. This one exists to fail fast on a PR,
+# before merge, rather than finding out from a red release run afterward.
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # arm64 emulation — self-hosters on Apple Silicon / arm64 servers need
+      # the image to actually build there too, not just on the amd64 runner.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build app image (migrator target)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: migrator
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build app image (runner target)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: runner
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.worker
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # docker-compose.yml's app/worker/migrate services declare `env_file:
+      # .env` explicitly — compose treats a missing *explicit* env_file as a
+      # hard error (unlike its optional implicit project-root .env autoload).
+      # .env itself is gitignored (it holds real secrets), so a fresh CI
+      # checkout never has one. This is a structural validation step only —
+      # nothing here actually runs the containers — so the committed
+      # .env.example is enough to satisfy it, same as the quick-start `cp
+      # .env.example .env` documented at the top of docker-compose.yml.
+      - name: Create placeholder .env for compose validation
+        run: cp .env.example .env
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet

@@ -1,0 +1,1 @@
+ALTER TABLE "workspaces" ALTER COLUMN "default_page_access" SET DEFAULT 'can_edit';

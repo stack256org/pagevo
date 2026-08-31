@@ -1,0 +1,154 @@
+# Turnkey self-hosted stack: Postgres + the Pagevo app + the pg-boss worker.
+#
+# Quick start:
+#   cp .env.example .env   # then set APP_SECRET and NEXT_PUBLIC_APP_URL
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+#   docker compose run --rm migrate   # first run only — see also the `migrate` service below
+#
+# The app is NOT published to a host port by this file — docker-compose.local.yml
+# does that, for running without a reverse proxy. Behind Dokploy/Traefik, Caddy,
+# or nginx-in-a-container, omit it: the proxy reaches the app over the Docker
+# network, so a host binding is only attack surface (and collides with whatever
+# already owns port 3000 — Dokploy's own dashboard, for one).
+#
+# Optional local stand-ins for external services (no S3 account / SMTP provider needed):
+#   docker compose --profile extras up -d
+#   → Mailpit (fake SMTP + web inbox) and MinIO (S3-compatible storage) become available.
+#     Point SMTP_HOST=mailpit / STORAGE_DRIVER=s3 + S3_ENDPOINT=http://minio:9000 at them — see SELF-HOSTING.md §4-5.
+
+services:
+  # SECURITY: the POSTGRES_PASSWORD default below (and this port mapping)
+  # are fine for local-only use, but if this host is reachable from the
+  # internet, set a real POSTGRES_PASSWORD in .env and either delete the
+  # `ports:` mapping here or firewall 5432 — otherwise anyone who can reach
+  # this host can connect to your database with the well-known default.
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pagevo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pagevo}
+      POSTGRES_DB: ${POSTGRES_DB:-pagevo}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pagevo} -d ${POSTGRES_DB:-pagevo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot migration runner. Re-run any time after `git pull` picks up new
+  # migrations: `docker compose run --rm migrate`
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pagevo}:${POSTGRES_PASSWORD:-pagevo}@postgres:5432/${POSTGRES_DB:-pagevo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pagevo}:${POSTGRES_PASSWORD:-pagevo}@postgres:5432/${POSTGRES_DB:-pagevo}
+    # Not published to the host: behind a reverse proxy (Dokploy/Traefik,
+    # Caddy, nginx in a container) the proxy reaches this container over the
+    # Docker network, so a host binding is only attack surface — and it
+    # collides with anything already on port 3000 (Dokploy's own dashboard
+    # uses 3000). To reach the app directly without a proxy, add
+    # `ports: ["${APP_PORT:-3000}:3000"]` back, or use docker-compose.local.yml.
+    expose:
+      - "3000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pagevo}:${POSTGRES_PASSWORD:-pagevo}@postgres:5432/${POSTGRES_DB:-pagevo}
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ── Optional stand-ins for external services — `docker compose --profile extras up` ──
+
+  # Fake SMTP catcher with a web inbox at http://localhost:8025 — use instead
+  # of a real email provider for local/self-test use. Point SMTP_HOST=mailpit,
+  # SMTP_PORT=1025 at it (no user/pass needed).
+  mailpit:
+    image: axllent/mailpit:latest
+    profiles: ["extras"]
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+  # Self-hosted S3-compatible object storage — use instead of a paid S3/R2
+  # account. Console at http://localhost:9001. Point STORAGE_DRIVER=s3,
+  # S3_ENDPOINT=http://minio:9000, S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY at the
+  # root user/password below, and create the bucket named in S3_BUCKET once
+  # via the console (or `docker compose exec minio mc mb local/<bucket>`).
+  minio:
+    image: minio/minio:latest
+    profiles: ["extras"]
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-pagevo}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-pagevo123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+
+volumes:
+  # Pinned to literal names (not just "postgres_data"/"uploads") on purpose:
+  # Compose namespaces unnamed volumes as "<compose-project-name>_<volume-name>",
+  # and some deploy tools (observed with Dokploy) don't keep the project name
+  # stable across redeploys — that silently creates a NEW, empty volume each
+  # time, orphaning the old one (DB data or uploads) without any error. An
+  # upload appears to work right after it's made (same container, same volume
+  # still mounted) but is gone after the next redeploy, because the redeployed
+  # container mounted a fresh, empty volume instead of the one holding the
+  # file. Pinning guarantees every deploy reattaches to the same volume.
+  postgres_data:
+    name: pagevo_postgres_data
+  uploads:
+    name: pagevo_uploads
+  minio_data:
+    name: pagevo_minio_data

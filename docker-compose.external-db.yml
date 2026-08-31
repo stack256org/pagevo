@@ -1,0 +1,28 @@
+# Override for using a third-party/managed Postgres (Neon, Supabase, Railway,
+# Render, DigitalOcean, AWS RDS, ...) instead of the bundled `postgres`
+# container. Full walkthrough: SELF-HOSTING.md §4.1-§4.3.
+#
+# Usage — set DATABASE_URL in .env to your provider's connection string first:
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml run --rm migrate
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d --build app worker
+#
+# This makes app/worker/migrate read DATABASE_URL directly from .env instead
+# of the base file's hardcoded bundled-Postgres connection string. The
+# bundled `postgres` service still starts alongside (Compose starts declared
+# dependencies regardless of which services you name on the command line),
+# but nothing queries it once this override is applied — see
+# SELF-HOSTING.md §4.2 for how to stop/remove it if you want to reclaim the
+# resources.
+
+services:
+  migrate:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+
+  app:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+
+  worker:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}

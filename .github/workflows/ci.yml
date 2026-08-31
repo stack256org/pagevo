@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint, test & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      # Pure-function tests only: secret encryption at rest and small UI
+      # helpers. No database, no network — see tests/.
+      - name: Test
+        run: pnpm test
+
+      # `next build` runs lib/env.ts validation, so it needs a syntactically
+      # valid DATABASE_URL and a 32+ char APP_SECRET. Nothing connects to a
+      # database during the build — these are placeholders only, matching
+      # the ones baked into the Dockerfile's build stage.
+      - name: Build
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://build:build@localhost:5432/build
+          APP_SECRET: ci-placeholder-secret-not-used-at-runtime-32ch
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  migrations:
+    name: Migrations apply cleanly
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Catches the failure mode that breaks self-hosters most often: a schema
+    # change committed without its generated migration, so the `migrate`
+    # service in docker-compose.yml dies on a fresh install.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pagevo_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run migrations against a fresh database
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pagevo_ci
+
+      - name: Fail if the schema has uncommitted migrations
+        run: |
+          pnpm db:generate
+          if ! git diff --quiet --exit-code drizzle; then
+            echo "::error::lib/db/schema changed without a generated migration."
+            echo "Run 'pnpm db:generate' and commit the result in drizzle/."
+            git diff --stat drizzle
+            exit 1
+          fi
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pagevo_ci

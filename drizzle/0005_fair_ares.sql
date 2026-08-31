@@ -1,0 +1,2 @@
+ALTER TABLE "database_views" ADD COLUMN "property_overrides" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "database_views" ADD COLUMN "property_order" jsonb DEFAULT '[]'::jsonb NOT NULL;

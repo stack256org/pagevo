@@ -1,0 +1,1 @@
+ALTER TYPE "public"."notification_type" ADD VALUE 'workspace_invite_accepted' BEFORE 'guest_accepted';

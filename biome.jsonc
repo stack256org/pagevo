@@ -1,0 +1,96 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/next",
+    "ultracite/biome/react"
+  ],
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "files": {
+    "includes": [
+      "**/*",
+      "!components/ui",
+      "!lib/utils.ts",
+      "!hooks/use-mobile.ts",
+      "!db/schema",
+      "!db/migrations",
+      "!.remember",
+      "!next-env.d.ts",
+      "!workers/**/worker-configuration.d.ts",
+      "!workers/**/.wrangler",
+      "!.claude"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noUnknownAtRules": "off",
+        "noConsole": "off",
+        "noBitwiseOperators": "off",
+        "noEmptyBlockStatements": "off",
+        "noGlobalIsNan": "off",
+        "noGlobalIsFinite": "off",
+        "useAwait": "off",
+        "noEvolvingTypes": "off",
+        "noImplicitAnyLet": "off"
+      },
+      "style": {
+        "noMagicNumbers": "off",
+        "noNestedTernary": "off",
+        "useConsistentTypeDefinitions": "off",
+        "noNonNullAssertion": "off",
+        "useNodejsImportProtocol": "off",
+        "useTemplate": "off",
+        "noParameterProperties": "off",
+        "noExportedImports": "off",
+        "useConsistentMemberAccessibility": "off",
+        "useConsistentArrayType": "off",
+        "useDefaultSwitchClause": "off",
+        "useAtIndex": "off"
+      },
+      "nursery": {
+        "useSortedClasses": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "useSimplifiedLogicExpression": "off",
+        "noVoid": "off",
+        "noUselessStringConcat": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off"
+      },
+      "correctness": {
+        "useUniqueElementIds": "off",
+        "useImageSize": "off"
+      },
+      "performance": {
+        "noBarrelFile": "off",
+        "useTopLevelRegex": "off",
+        "noNamespaceImport": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      // react-email templates are rendered exactly once to a static HTML
+      // string by @react-email/render inside a pg-boss job — there is no
+      // reconciler, no component state, and no reorder. React keys are inert
+      // here, so noArrayIndexKey cannot describe a real defect in this
+      // directory. Scoped rather than inline-suppressed because it applies
+      // structurally to every email template, present and future.
+      "includes": ["lib/email/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noArrayIndexKey": "off"
+          }
+        }
+      }
+    }
+  ]
+}
